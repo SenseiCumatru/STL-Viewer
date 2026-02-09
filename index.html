@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STL Viewer Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .viewer-container {
+            width: 400px;
+            height: 300px;
+            margin: 20px auto;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .viewer-container.fullscreen {
+            width: 900px;
+            height: 650px;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            margin: 0;
+        }
+        
+        #stl_cont {
+            width: 100%;
+            height: 100%;
+            border: 2px solid #333;
+            background-color: #2a2a2a;
+            position: relative;
+        }
+        .info {
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+        }
+        
+        .controls {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .viewer-container.fullscreen .controls {
+            display: flex;
+        }
+        
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+            pointer-events: auto;
+        }
+        
+        .control-btn:hover {
+            background: rgba(240, 240, 240, 0.95);
+            transform: scale(1.1);
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .control-separator {
+            height: 1px;
+            background: #ccc;
+            margin: 5px 0;
+            pointer-events: none;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .viewer-container.fullscreen .zoom-controls {
+            display: flex;
+        }
+        
+        .zoom-btn {
+            width: 35px;
+            height: 35px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            pointer-events: auto;
+        }
+        
+        .zoom-btn:hover {
+            background: rgba(224, 224, 224, 0.95);
+        }
+        
+        .platform-label {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 50;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .viewer-container.fullscreen .platform-label {
+            display: block;
+        }
+        
+        .upload-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+            z-index: 100;
+        }
+        
+        .upload-btn:hover {
+            background: rgba(240, 240, 240, 0.95);
+            transform: scale(1.1);
+        }
+        
+        .upload-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .view-mode-btn {
+            position: absolute;
+            top: 70px;
+            left: 10px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+            z-index: 100;
+        }
+        
+        .view-mode-btn:hover {
+            background: rgba(240, 240, 240, 0.95);
+            transform: scale(1.1);
+        }
+        
+        .view-mode-btn:active {
+            transform: scale(0.95);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .fullscreen-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 999;
+        }
+        
+        .fullscreen-overlay.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>STL Viewer - Test</h1>
+    
+    <div class="fullscreen-overlay" id="fullscreenOverlay"></div>
+    
+    <div class="viewer-container" id="viewerContainer">
+        <div id="stl_cont"></div>
+        
+        <div class="platform-label">3WE.com</div>
+        
+        <div class="upload-btn" id="uploadBtn" title="Încarcă fișier STL">📁</div>
+        <input type="file" id="fileInput" accept=".stl,.obj,.3mf" />
+        
+        <div class="view-mode-btn" id="viewModeBtn" title="Mărește pentru vizualizare detaliată">🔍</div>
+        
+        <div class="controls">
+            <div class="control-btn" id="homeBtn" title="Resetare cameră">⌂</div>
+            <div class="control-separator"></div>
+            <div class="control-btn" id="layFlatBtn" title="Auto Lay Flat - alege partea cea mai plată">⬇</div>
+            <div class="control-separator"></div>
+            <div class="control-btn" id="rotXBtn" title="Rotire X cu 90°">↻X</div>
+            <div class="control-btn" id="rotZBtn" title="Rotire Z cu 90°">↻Z</div>
+            <div class="control-separator"></div>
+            <div class="control-btn" id="upBtn" title="Rotire sus">▲</div>
+            <div class="control-btn" id="leftBtn" title="Rotire stânga">◄</div>
+            <div class="control-btn" id="centerBtn" title="Centru">●</div>
+            <div class="control-btn" id="rightBtn" title="Rotire dreapta">►</div>
+            <div class="control-btn" id="downBtn" title="Rotire jos">▼</div>
+        </div>
+        
+        <div class="zoom-controls">
+            <div class="zoom-btn" id="zoomInBtn" title="Mărește">+</div>
+            <div class="zoom-btn" id="zoomOutBtn" title="Micșorează">-</div>
+        </div>
+        
+        <div class="platform-label">3WE.com</div>
+    </div>
+    
+    <div class="info">
+        <p style="margin: 10px 0;">
+            <strong>📁</strong> Încarcă fișier STL &nbsp;|&nbsp; 
+            <strong>🔍</strong> Mărește pentru vizualizare detaliată
+        </p>
+        <p style="margin: 10px 0; font-size: 14px; color: #888;">
+            <strong>Rotire:</strong> Click Stânga &nbsp;|&nbsp; 
+            <strong>Mutare:</strong> Click Dreapta &nbsp;|&nbsp; 
+            <strong>Zoom:</strong> Rotiță Mouse
+        </p>
+    </div>
+
+    <script src="stl_viewer.min.js"></script>
+    
+    <script>
+        window.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        }, false);
+        
+        window.addEventListener('drop', function(e) {
+            e.preventDefault();
+        }, false);
+        
+        var stl_viewer;
+        var modelRotations = {};
+        var currentModelId = 0;
+        var showPlatform = false;
+        var isFullscreen = false;
+        
+        stl_viewer = new StlViewer(
+            document.getElementById("stl_cont"), 
+            {
+                allow_drag_and_drop: true,
+                auto_rotate: false,
+                auto_resize: true,
+                bgcolor: "#2a2a2a",
+                center_models: true,
+                
+                ready_callback: function() {
+                    console.log("STL Viewer este gata!");
+                    updatePlatformVisibility();
+                },
+                
+                model_loaded_callback: function(model_id) {
+                    console.log("=== MODEL LOADED CALLBACK === Model ID:", model_id);
+                    
+                    currentModelId = model_id;
+                    modelRotations[model_id] = {x: 0, y: 0, z: 0};
+                    stl_viewer.set_color(model_id, "#20B2AA");
+                    
+                    var model_info = stl_viewer.get_model_info(model_id);
+                    console.log("Dimensiuni model:", model_info.dims);
+                    
+                    console.log(">>> Începe căutarea mesh-ului după 300ms...");
+                    
+                    // Așteaptă ca modelul să fie complet încărcat în scenă
+                    setTimeout(function() {
+                        // Găsește mesh-ul pentru calcul precis
+                        var mesh = null;
+                        
+                        console.log("=== CĂUTARE MESH ===");
+                        console.log("Scene children:", stl_viewer.scene.children.length);
+                        
+                        // Încearcă să acceseze direct modelul din viewer
+                        if (stl_viewer.models && stl_viewer.models[model_id]) {
+                            var model = stl_viewer.models[model_id];
+                            console.log("✓ Găsit prin stl_viewer.models[" + model_id + "]");
+                            console.log("Model type:", typeof model);
+                            console.log("Model properties:", Object.keys(model));
+                            
+                            // Verifică dacă are proprietatea mesh
+                            if (model.mesh) {
+                                mesh = model.mesh;
+                                console.log("✓ Accesat model.mesh");
+                            } else if (model.object3D) {
+                                mesh = model.object3D;
+                                console.log("✓ Accesat model.object3D");
+                            } else if (model.isMesh) {
+                                mesh = model;
+                                console.log("✓ Model este direct mesh");
+                            }
+                        }
+                        
+                        // Listează toate obiectele din scenă
+                        if (!mesh) {
+                            var meshCount = 0;
+                            stl_viewer.scene.traverse(function(child) {
+                                if (child.isMesh) {
+                                    meshCount++;
+                                    console.log("Mesh #" + meshCount + ":", child.type, "Name:", child.name, "Material color:", child.material ? child.material.color : "none");
+                                }
+                            });
+                        }
+                        
+                        // Caută mesh-ul STL (exclude platforma aurie)
+                        if (!mesh) {
+                            console.log("Căutăm primul mesh STL (non-platformă)...");
+                            stl_viewer.scene.traverse(function(child) {
+                                if (child.isMesh && !mesh && child.geometry) {
+                                    var isGold = child.material && child.material.color && child.material.color.getHex() === 0xFFD700;
+                                    var isGrid = child.type === "GridHelper" || child.name === "grid";
+                                    if (!isGold && !isGrid) {
+                                        mesh = child;
+                                        console.log("✓ Găsit primul mesh STL (non-platformă)");
+                                    }
+                                }
+                            });
+                        }
+                        
+                        if (mesh) {
+                            // Resetează poziția la origine pentru calcul
+                            mesh.position.set(0, 0, 0);
+                            mesh.rotation.set(0, 0, 0);
+                            mesh.updateMatrix();
+                            mesh.updateMatrixWorld(true);
+                            
+                            // Forțează recalcularea geometriei
+                            if (mesh.geometry.boundingBox === null) {
+                                mesh.geometry.computeBoundingBox();
+                            }
+                            
+                            setTimeout(function() {
+                            // Rotație automată -90° pe X pentru orientare corectă (fundul jos)
+                            console.log("=== ROTAȚIE AUTOMATĂ ===");
+                            
+                            // IMPORTANT: Resetează poziția înainte de rotație
+                            mesh.position.set(0, 0, 0);
+                            mesh.rotation.set(-Math.PI / 2, 0, 0);
+                            modelRotations[model_id] = {x: -Math.PI / 2, y: 0, z: 0};
+                            mesh.updateMatrixWorld(true);
+                            console.log("✓ Rotit -90° pe axa X pentru orientare printare");
+                                console.log("=== POZIȚIONARE INIȚIALĂ ===");
+                                
+                                // Calculează bounding box pentru poziționare (după resetare poziție)
+                                var bbox = new THREE.Box3().setFromObject(mesh);
+                                
+                                console.log("Bounding box - min.y:", bbox.min.y, "max.y:", bbox.max.y);
+                                
+                                // Calculează offset pentru a pune partea de jos exact la Y=0
+                                var offsetY = -bbox.min.y;
+                                
+                                console.log("Offset calculat:", offsetY);
+                                
+                                // Setează poziția finală
+                                mesh.position.y = offsetY;
+                                mesh.updateMatrixWorld(true);
+                                
+                                // Verifică poziționarea finală
+                                var finalBbox = new THREE.Box3().setFromObject(mesh);
+                                console.log("Final - min.y:", finalBbox.min.y, "max.y:", finalBbox.max.y);
+                                
+                                if (finalBbox.min.y < -0.1) {
+                                    console.warn("ATENȚIE: Modelul încă trece prin platformă!");
+                                } else {
+                                    console.log("✓ Model corect poziționat pe platformă");
+                                    console.log("💡 Folosește butonul ⬇ pentru a roti modelul");
+                                }
+                                
+                                stl_viewer.set_auto_zoom();
+                                
+                                // Ajustează camera pentru preview după zoom
+                                setTimeout(function() {
+                                    if (!isFullscreen && stl_viewer.camera) {
+                                        // Ridică camera mult mai sus pentru a plasa modelul jos în cadru
+                                        stl_viewer.camera.position.set(80, 120, 80);
+                                        stl_viewer.camera.lookAt(0, 0, 0);
+                                        console.log("✓ Camera ajustată pentru preview la încărcare");
+                                    }
+                                }, 100);
+                            }, 200);
+                        } else {
+                            console.log("Nu am găsit mesh-ul - folosesc fallback");
+                            var height_offset = model_info.dims.y / 2;
+                            stl_viewer.set_position(model_id, 0, height_offset, 0);
+                            stl_viewer.set_auto_zoom();
+                        }
+                    }, 200);
+                },
+                
+                load_error_callback: function(error) {
+                    console.error("=== EROARE ÎNCĂRCARE MODEL ===", error);
+                    alert("Eroare la încărcarea fișierului: " + error);
+                },
+                
+                loading_progress_callback: function(load_status, load_session) {
+                    console.log("Loading progress:", load_status, "Session:", load_session);
+                }
+            }
+        );
+        
+        console.log("STL Viewer initialized");
+        
+        var rotationSpeed = 0.5;
+        var zoomStep = 1.2;
+        
+        document.getElementById('uploadBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Click pe upload button");
+            document.getElementById('fileInput').click();
+        });
+        
+        document.getElementById('viewModeBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            isFullscreen = !isFullscreen;
+            
+            var container = document.getElementById('viewerContainer');
+            var overlay = document.getElementById('fullscreenOverlay');
+            
+            if (isFullscreen) {
+                showPlatform = true;
+                container.classList.add('fullscreen');
+                overlay.classList.add('active');
+                console.log("Mod fullscreen + platformă activat");
+                
+                // Așteaptă aplicarea CSS
+                setTimeout(function() {
+                    // Forțează recalcularea dimensiunilor
+                    var stlCont = document.getElementById('stl_cont');
+                    console.log("Dimensiuni noi:", stlCont.offsetWidth, "x", stlCont.offsetHeight);
+                    
+                    // Trigger resize pentru THREE.js
+                    window.dispatchEvent(new Event('resize'));
+                    
+                    // Activează grid-ul
+                    updatePlatformVisibility();
+                    
+                    // NU repoziționăm modelul - păstrăm poziția corectă din încărcare
+                    console.log("✓ Fullscreen activ - model rămâne în poziția sa corectă");
+                    
+                    setTimeout(function() {
+                        stl_viewer.set_auto_zoom();
+                        window.dispatchEvent(new Event('resize'));
+                    }, 150);
+                }, 100);
+                
+            } else {
+                showPlatform = false;
+                container.classList.remove('fullscreen');
+                overlay.classList.remove('active');
+                console.log("Mod preview mic activat");
+                
+                setTimeout(function() {
+                    window.dispatchEvent(new Event('resize'));
+                    updatePlatformVisibility();
+                    
+                    setTimeout(function() {
+                        if (currentModelId >= 0) {
+                            try {
+                                // Zoom pentru a vedea tot modelul centrat în preview
+                                stl_viewer.set_auto_zoom();
+                                
+                                // Ajustează camera pentru a vedea modelul perfect centrat
+                                if (stl_viewer.camera) {
+                                    // Ridică camera mult mai sus pentru a plasa modelul jos în cadru
+                                    stl_viewer.camera.position.set(80, 120, 80);
+                                    stl_viewer.camera.lookAt(0, 0, 0);
+                                    console.log("✓ Preview: model poziționat jos în cadru");
+                                }
+                            } catch(e) {
+                                console.log("Eroare ajustare camera:", e);
+                            }
+                        }
+                        
+                        setTimeout(function() {
+                            window.dispatchEvent(new Event('resize'));
+                        }, 100);
+                    }, 200);
+                }, 50);
+            }
+        });
+        
+        document.getElementById('fullscreenOverlay').addEventListener('click', function() {
+            if (isFullscreen) {
+                document.getElementById('viewModeBtn').click();
+            }
+        });
+        
+        var textMesh = null;
+        var peiPlate = null;
+        
+        function createPEIPlate() {
+            // Creează un plane pentru platformă PEI
+            var geometry = new THREE.PlaneGeometry(800, 800);
+            var material = new THREE.MeshStandardMaterial({ 
+                color: 0xFFD700, // Auriu pentru PEI
+                metalness: 0.3,
+                roughness: 0.7,
+                side: THREE.DoubleSide
+            });
+            var plate = new THREE.Mesh(geometry, material);
+            
+            // Rotește platforma pentru a fi orizontală (pe planul XZ)
+            plate.rotation.x = -Math.PI / 2;
+            plate.position.y = 0;
+            
+            // Adaugă grid lines pe platformă
+            var gridHelper = new THREE.GridHelper(800, 80, 0x888888, 0x444444);
+            gridHelper.position.y = 0.1; // Puțin deasupra pentru a fi vizibil
+            
+            var group = new THREE.Group();
+            group.add(plate);
+            group.add(gridHelper);
+            
+            return group;
+        }
+        
+        function createBrandText() {
+            var canvas = document.createElement('canvas');
+            var context = canvas.getContext('2d');
+            canvas.width = 2048;
+            canvas.height = 512;
+            
+            // Fundal transparent
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            
+            context.font = 'Bold 240px Arial';
+            context.textAlign = 'left';
+            context.textBaseline = 'middle';
+            
+            var x = 50;
+            var y = 256;
+            
+            // Desenează "WWW." în gri
+            context.fillStyle = '#AAAAAA';
+            context.fillText('WWW.', x, y);
+            x += context.measureText('WWW.').width + 40;
+            
+            // Desenează "3" în albastru
+            context.fillStyle = '#0066FF';
+            context.fillText('3', x, y);
+            x += context.measureText('3').width + 20;
+            
+            // Desenează "W" în galben
+            context.fillStyle = '#FFD700';
+            context.fillText('W', x, y);
+            x += context.measureText('W').width + 20;
+            
+            // Desenează "E" în roșu
+            context.fillStyle = '#FF0000';
+            context.fillText('E', x, y);
+            x += context.measureText('E').width + 40;
+            
+            // Desenează ".COM" în gri
+            context.fillStyle = '#AAAAAA';
+            context.fillText('.COM', x, y);
+            
+            var texture = new THREE.Texture(canvas);
+            texture.needsUpdate = true;
+            
+            // Creează un plane mesh în loc de sprite
+            var geometry = new THREE.PlaneGeometry(700, 90);
+            var material = new THREE.MeshBasicMaterial({ 
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            var mesh = new THREE.Mesh(geometry, material);
+            
+            // Poziționează pe platformă, rotit să fie citit de sus
+            mesh.position.set(0, 0.1, 200);
+            mesh.rotation.x = -Math.PI / 2; // Rotit să stea pe platformă
+            
+            return mesh;
+        }
+        
+        function updatePlatformVisibility() {
+            // Șterge textul vechi
+            if (textMesh) {
+                stl_viewer.scene.remove(textMesh);
+                textMesh = null;
+            }
+            
+            // Șterge platforma veche
+            if (peiPlate) {
+                stl_viewer.scene.remove(peiPlate);
+                peiPlate = null;
+            }
+            
+            if (showPlatform) {
+                // Nu mai folosim grid-ul standard
+                stl_viewer.set_grid(false);
+                
+                // Adaugă platforma PEI
+                peiPlate = createPEIPlate();
+                stl_viewer.scene.add(peiPlate);
+                
+                // Adaugă text "WWW.3WE.COM" pe platformă
+                textMesh = createBrandText();
+                stl_viewer.scene.add(textMesh);
+                
+            } else {
+                stl_viewer.set_grid(false);
+            }
+        }
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            console.log("Change event triggered");
+            var file = e.target.files[0];
+            
+            if (file) {
+                console.log("Fișier selectat:", file.name, "Type:", file.type, "Size:", file.size);
+                
+                try {
+                    stl_viewer.clean();
+                    console.log("Viewer cleaned");
+                } catch(err) {
+                    console.log("Clean error:", err);
+                }
+                
+                currentModelId = 0;
+                modelRotations = {};
+                
+                console.log("Încărcare model cu ID:", currentModelId);
+                
+                stl_viewer.add_model({
+                    id: currentModelId,
+                    local_file: file,
+                    filename: file.name
+                });
+                
+                console.log("add_model apelat");
+                e.target.value = '';
+            } else {
+                console.log("Nu a fost selectat niciun fișier");
+            }
+        });
+        
+        document.getElementById('homeBtn').addEventListener('click', function() {
+            stl_viewer.set_auto_zoom();
+        });
+        
+        // Variabilă pentru tracking orientare curentă
+        var currentOrientation = 0;
+        
+        document.getElementById('layFlatBtn').addEventListener('click', function() {
+            if (currentModelId >= 0) {
+                try {
+                    var model = stl_viewer.models[currentModelId];
+                    if (!model || !model.mesh) return;
+                    
+                    var mesh = model.mesh;
+                    
+                    // Cele 6 orientări posibile
+                    var orientations = [
+                        {name: "Z jos (fund jos -90°X)", rotX: -Math.PI / 2, rotY: 0, rotZ: 0},
+                        {name: "Z sus (fund sus 90°X)", rotX: Math.PI / 2, rotY: 0, rotZ: 0},
+                        {name: "Y original", rotX: 0, rotY: 0, rotZ: 0},
+                        {name: "Y invers (180°X)", rotX: Math.PI, rotY: 0, rotZ: 0},
+                        {name: "X lateral (-90°Z)", rotX: 0, rotY: 0, rotZ: -Math.PI / 2},
+                        {name: "X lateral (90°Z)", rotX: 0, rotY: 0, rotZ: Math.PI / 2}
+                    ];
+                    
+                    // Ciclează la următoarea orientare
+                    currentOrientation = (currentOrientation + 1) % orientations.length;
+                    var orient = orientations[currentOrientation];
+                    
+                    console.log("=== SCHIMBARE ORIENTARE === " + orient.name);
+                    
+                    // Resetează poziția
+                    mesh.position.set(0, 0, 0);
+                    
+                    // Aplică rotația
+                    mesh.rotation.set(orient.rotX, orient.rotY, orient.rotZ);
+                    modelRotations[currentModelId] = {x: orient.rotX, y: orient.rotY, z: orient.rotZ};
+                    mesh.updateMatrixWorld(true);
+                    
+                    // Repoziționează pe platformă
+                    var bbox = new THREE.Box3().setFromObject(mesh);
+                    var offsetY = -bbox.min.y;
+                    mesh.position.y = offsetY;
+                    mesh.updateMatrixWorld(true);
+                    
+                    // Afișare dimensiuni
+                    var finalBbox = new THREE.Box3().setFromObject(mesh);
+                    var width = finalBbox.max.x - finalBbox.min.x;
+                    var depth = finalBbox.max.z - finalBbox.min.z;
+                    var height = finalBbox.max.y - finalBbox.min.y;
+                    console.log("Dimensiuni: " + width.toFixed(1) + " x " + depth.toFixed(1) + " x " + height.toFixed(1) + " mm");
+                    console.log("✓ Poziționat: min.y=" + finalBbox.min.y.toFixed(2));
+                    
+                    stl_viewer.set_auto_zoom();
+                } catch(e) {
+                    console.log("Eroare schimbare orientare:", e);
+                }
+            }
+        });
+        
+        document.getElementById('rotXBtn').addEventListener('click', function() {
+            if (currentModelId >= 0) {
+                var model = stl_viewer.models[currentModelId];
+                if (model && model.mesh) {
+                    var mesh = model.mesh;
+                    var currentRot = modelRotations[currentModelId];
+                    var newRotX = (currentRot.x + Math.PI / 2) % (Math.PI * 2);
+                    
+                    mesh.position.set(0, 0, 0);
+                    mesh.rotation.set(newRotX, 0, currentRot.z);
+                    modelRotations[currentModelId].x = newRotX;
+                    mesh.updateMatrixWorld(true);
+                    
+                    var bbox = new THREE.Box3().setFromObject(mesh);
+                    mesh.position.y = -bbox.min.y;
+                    mesh.updateMatrixWorld(true);
+                    stl_viewer.set_auto_zoom();
+                }
+            }
+        });
+        
+        document.getElementById('rotZBtn').addEventListener('click', function() {
+            if (currentModelId >= 0) {
+                var model = stl_viewer.models[currentModelId];
+                if (model && model.mesh) {
+                    var mesh = model.mesh;
+                    var currentRot = modelRotations[currentModelId];
+                    var newRotZ = (currentRot.z + Math.PI / 2) % (Math.PI * 2);
+                    
+                    mesh.position.set(0, 0, 0);
+                    mesh.rotation.set(currentRot.x, 0, newRotZ);
+                    modelRotations[currentModelId].z = newRotZ;
+                    mesh.updateMatrixWorld(true);
+                    
+                    var bbox = new THREE.Box3().setFromObject(mesh);
+                    mesh.position.y = -bbox.min.y;
+                    mesh.updateMatrixWorld(true);
+                    stl_viewer.set_auto_zoom();
+                }
+            }
+        });
+        
+        document.getElementById('upBtn').addEventListener('click', function() {
+            rotateAllModels(rotationSpeed, 0, 0);
+        });
+        
+        document.getElementById('downBtn').addEventListener('click', function() {
+            rotateAllModels(-rotationSpeed, 0, 0);
+        });
+        
+        document.getElementById('leftBtn').addEventListener('click', function() {
+            rotateAllModels(0, rotationSpeed, 0);
+        });
+        
+        document.getElementById('rightBtn').addEventListener('click', function() {
+            rotateAllModels(0, -rotationSpeed, 0);
+        });
+        
+        document.getElementById('centerBtn').addEventListener('click', function() {
+            resetModelOrientation();
+        });
+        
+        document.getElementById('zoomInBtn').addEventListener('click', function() {
+            var camera_state = stl_viewer.get_camera_state();
+            camera_state.position.x /= zoomStep;
+            camera_state.position.y /= zoomStep;
+            camera_state.position.z /= zoomStep;
+            stl_viewer.set_camera_state(camera_state);
+        });
+        
+        document.getElementById('zoomOutBtn').addEventListener('click', function() {
+            var camera_state = stl_viewer.get_camera_state();
+            camera_state.position.x *= zoomStep;
+            camera_state.position.y *= zoomStep;
+            camera_state.position.z *= zoomStep;
+            stl_viewer.set_camera_state(camera_state);
+        });
+        
+        function rotateAllModels(x, y, z) {
+            try {
+                for (var i = 0; i <= currentModelId; i++) {
+                    var info = stl_viewer.get_model_info(i);
+                    if (info) {
+                        if (!modelRotations[i]) {
+                            modelRotations[i] = {x: 0, y: 0, z: 0};
+                        }
+                        modelRotations[i].x += x;
+                        modelRotations[i].y += y;
+                        modelRotations[i].z += z;
+                        
+                        stl_viewer.rotate(i, x, y, z);
+                    }
+                }
+            } catch(e) {
+                console.log("Eroare rotație:", e);
+            }
+        }
+        
+        function resetModelOrientation() {
+            try {
+                for (var i = 0; i <= currentModelId; i++) {
+                    var info = stl_viewer.get_model_info(i);
+                    if (info) {
+                        modelRotations[i] = {x: 0, y: 0, z: 0};
+                        
+                        stl_viewer.animate_model(i, {
+                            exact: {
+                                rotationx: 0,
+                                rotationy: 0,
+                                rotationz: 0,
+                                msec: 300
+                            }
+                        });
+                        
+                        setTimeout(function() {
+                            var model_info = stl_viewer.get_model_info(i);
+                            if (model_info) {
+                                var height_offset = model_info.dims.y / 2;
+                                stl_viewer.set_position(i, 0, height_offset, 0);
+                            }
+                        }, 350);
+                    }
+                }
+                
+                setTimeout(function() {
+                    stl_viewer.set_auto_zoom();
+                }, 400);
+            } catch(e) {
+                console.log("Eroare resetare:", e);
+            }
+        }
+    </script>
+</body>
+</html>
