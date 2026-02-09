@@ -544,29 +544,11 @@
         var peiPlate = null;
         
         function createPEIPlate() {
-            // Creează un plane pentru platformă PEI
-            var geometry = new THREE.PlaneGeometry(800, 800);
-            var material = new THREE.MeshStandardMaterial({ 
-                color: 0xFFD700, // Auriu pentru PEI
-                metalness: 0.3,
-                roughness: 0.7,
-                side: THREE.DoubleSide
-            });
-            var plate = new THREE.Mesh(geometry, material);
-            
-            // Rotește platforma pentru a fi orizontală (pe planul XZ)
-            plate.rotation.x = -Math.PI / 2;
-            plate.position.y = 0;
-            
-            // Adaugă grid lines pe platformă
+            // Creează doar grid-ul transparent
             var gridHelper = new THREE.GridHelper(800, 80, 0x888888, 0x444444);
-            gridHelper.position.y = 0.1; // Puțin deasupra pentru a fi vizibil
+            gridHelper.position.y = 0;
             
-            var group = new THREE.Group();
-            group.add(plate);
-            group.add(gridHelper);
-            
-            return group;
+            return gridHelper;
         }
         
         function createBrandText() {
